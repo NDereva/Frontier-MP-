@@ -1,0 +1,34 @@
+---
+title: "Data Prep"
+author: "Mykola Dereva"
+date: "3/8/2021"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(readxl)
+```
+
+
+Load main data related to companies cost structure
+Data is formated in a very interesting way so I expect a lot of work to make it 
+tidy
+
+```{r}
+data <- read_xlsx(path = here("Raw Data",
+                              "Costs structure 2012-2019  +.xlsx"),
+                  na = c("к/с", "−"), skip = 5, trim_ws = TRUE
+                  )
+
+```
+
+Have to rename colnames manually
+
+```{r}
+data %>% 
+  col
+```
+
