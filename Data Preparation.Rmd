@@ -38,6 +38,11 @@ data <- read_xlsx(path = here("Raw Data",
 
 ```
 
+
+```{r}
+tail(data)
+```
+
 Data have 2 levels of aggregation I think it will be safer to parse it with
 one variable in time
 
@@ -65,7 +70,8 @@ clean <- data %>%
   pivot_longer(cols = c("large", "medium", "small", "micro"),
                names_to = "firm_size", values_to = "total_cost") %>%
   fill(group_name, group_code, .direction = "down") %>% 
-  mutate_at(c("total_cost"), as.numeric)
+  mutate_at(c("total_cost"), as.numeric) %>% 
+  mutate(year = as.integer(year))
 
   
 head(clean)
@@ -96,7 +102,8 @@ extract_firms_var <- function(data,
   pivot_longer(cols = c("large", "medium", "small", "micro"),
                names_to = "firm_size", values_to = var_name) %>% 
   fill(group_code, .direction = "down") %>% 
-  mutate_at(c(var_name), as.numeric)
+  mutate_at(c(var_name), as.numeric) %>% 
+  mutate(year = as.integer(year))
 
   
   }
@@ -152,12 +159,124 @@ head(clean)
 ```
 
 
-
+Check if the total cost equal sum of cost structure
 ```{r}
 clean %>% 
-  filter(group_code == "A", year == 2015, firm_size == "small") %>% 
+  filter(year == 2015, firm_size == "medium") %>%
+  group_by(group_code) %>% 
   mutate(sum_cost = sum(material_cost, amortisation_cost, labour_cost,
            social_security_cost, other_cost)) %>% 
-  select(total_cost, sum_cost)
+  select(total_cost, sum_cost) %>% 
+  head(10)
 ```
-The 
+The numbers match. 
+
+
+Load data related to revenues
+
+
+
+```{r}
+colnames <- str_c("c", 1:13) 
+
+data <- read_xlsx(path = here("Raw Data",
+                              "Production Value 2012-2019  +.xlsx"),
+                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  skip = 13, n_max = 7744, # specific to this file
+                  col_names = colnames)
+
+```
+
+
+```{r}
+tail(data)
+```
+
+
+
+I dont know what exactly is this dash.
+so I assign it
+```{r}
+(irritating_value <- data$c5[7700])
+```
+
+```{r}
+data <- data %>% 
+  fill("c2", .direction = "down") %>% 
+  na_if("к/с") %>% # read_xlsx did not changed it to NA
+  na_if(irritating_value)
+```
+
+Now NAs coded properly
+
+
+```{r}
+revenue <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c5", medium = "c7",
+                    small = "c9", micro = "c11",
+                    var_name = "revenue")
+
+head(revenue)
+```
+
+
+```{r}
+clean <- clean %>%
+  left_join(revenue)
+```
+
+
+
+The last part is the dataset reladed to the firms number
+
+
+```{r}
+colnames <- str_c("c", 1:32) 
+
+data <- read_xlsx(path = here("Raw Data",
+                              "Firms Number 2010-2019  +.xlsx"),
+                  na = c(irritating_value),    
+                  skip = 16, n_max = 9680, # specific to this file
+                  col_names = colnames)
+```
+
+```{r}
+tail(data)
+```
+
+```{r}
+(irritating_value <-  data$c4[9680])
+```
+
+```{r}
+data <- data %>% 
+  fill("c2", .direction = "down") %>% 
+  na_if(irritating_value)
+```
+
+
+```{r}
+tail(data)
+```
+
+
+
+```{r}
+firms_n <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c4", medium = "c6",
+                    small = "c8", micro = "c10",
+                    var_name = "n_firms")
+head(firms_n)
+```
+
+```{r}
+clean <- clean %>%
+  left_join(firms_n)
+```
+
+```{r}
+head(clean)
+```
+
