@@ -280,3 +280,19 @@ clean <- clean %>%
 head(clean)
 ```
 
+
+Check how many NAs in each group. 
+To know which we can use for further analysis 
+
+```{r}
+(
+no_na <- clean %>%
+  group_by(group_name) %>% 
+  summarise_if(is.numeric, ~ sum(is.na(.))) %>%
+  mutate(total_na = rowSums(across(where(is.numeric)))) %>% 
+  select(group_name, total_na) %>% 
+  filter(total_na == 0)
+)
+```
+
+
