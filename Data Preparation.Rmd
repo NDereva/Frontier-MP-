@@ -5,7 +5,7 @@ date: "3/8/2021"
 output: html_document
 ---
 
-
+# Load libraries
 ```{r}
 rm(list = ls())
 
@@ -22,11 +22,10 @@ Sys.setlocale("LC_CTYPE", "ukrainian")
 
 Load main data related to companies cost structure
 Data is obtained from ukrainian statistic service (ukrstat.gov.ua)
-Data is formatted in a very interesting way so I expect a lot of work to make it 
-tidy
+Data is formatted in a very interesting way so I expect a lot of work to make it tidy
 
 
-
+#  Cost Structure
 ```{r}
 colnames <- str_c("col_", 1:28) 
 
@@ -50,7 +49,7 @@ one variable in time
 fill name code and year to each row:
 ```{r}
 data <- data %>% 
-  fill(1:2,28, .direction = "down") %>% 
+  fill(1:2, 28, .direction = "down") %>% 
   na_if("к/с")  # read_xlsx did not changed it to NA
 ```
 
@@ -70,7 +69,7 @@ clean <- data %>%
   pivot_longer(cols = c("large", "medium", "small", "micro"),
                names_to = "firm_size", values_to = "total_cost") %>%
   fill(group_name, group_code, .direction = "down") %>% 
-  mutate_at(c("total_cost"), as.numeric) %>% 
+  mutate_at(c("total_cost"), as.numeric) %>%  # convert to numeric
   mutate(year = as.integer(year))
 
   
@@ -86,6 +85,9 @@ structure.
 Helper function to automate previous chunk
 
 ```{r}
+# Here one just need to specify the columns with the data of interest
+# for large, medium... company size 
+
 extract_firms_var <- function(data,
                               group_code = "col_2",
                               year       = "col_3",
@@ -123,10 +125,10 @@ head(material_costs)
 Seems to work fine
 
 ```{r}
-amortisation <- data %>% 
+depreciation <- data %>% 
   extract_firms_var(large = "col_12", medium = "col_13",
                     small = "col_14", micro = "col_15",
-                    var_name = "amortisation_cost")
+                    var_name = "depreciation_cost")
 
 wages <- data %>% 
   extract_firms_var(large = "col_16", medium = "col_17",
@@ -150,7 +152,7 @@ join to the clean dataset
 ```{r}
 clean <- clean %>%
   left_join(material_costs) %>% 
-  left_join(amortisation) %>% 
+  left_join(depreciation) %>% 
   left_join(wages) %>% 
   left_join(soc_security) %>% 
   left_join(other)
@@ -164,16 +166,16 @@ Check if the total cost equal sum of cost structure
 clean %>% 
   filter(year == 2015, firm_size == "medium") %>%
   group_by(group_code) %>% 
-  mutate(sum_cost = sum(material_cost, amortisation_cost, labour_cost,
+  mutate(sum_cost = sum(material_cost, depreciation_cost, labour_cost,
            social_security_cost, other_cost)) %>% 
   select(total_cost, sum_cost) %>% 
   head(10)
 ```
 The numbers match. 
 
+# Revenues
 
-Load data related to revenues
-
+### Load data related to revenues
 
 
 ```{r}
@@ -194,7 +196,7 @@ tail(data)
 
 
 
-I dont know what exactly is this dash.
+I dont know what exactly is this dash above is coded
 so I assign it
 ```{r}
 (irritating_value <- data$c5[7700])
@@ -227,8 +229,8 @@ clean <- clean %>%
 ```
 
 
+# Firms number 
 
-The last part is the dataset reladed to the firms number
 
 
 ```{r}
@@ -279,6 +281,187 @@ clean <- clean %>%
 ```{r}
 head(clean)
 ```
+
+
+
+# Number of Employees
+
+
+
+```{r}
+colnames <- str_c("c", 1:13) 
+
+data <- read_xlsx(path = here("Raw Data",
+                              "Number of Employers 2010-2020 +.xlsx"),
+                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  skip = 17, n_max = 10648, # specific to this file
+                  col_names = colnames)
+
+```
+
+
+
+```{r}
+tail(data)
+```
+
+
+```{r}
+(irritating_value <-  data$c5[10647])
+```
+
+```{r}
+data <- data %>% 
+  fill("c2", .direction = "down") %>% 
+  na_if(irritating_value)
+
+tail(data)
+```
+
+
+
+```{r}
+employers_n <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c5", medium = "c7",
+                    small = "c9", micro = "c11",
+                    var_name = "employers_n")
+head(employers_n)
+```
+
+
+
+```{r}
+clean <- clean %>%
+  left_join(employers_n)
+```
+
+
+# Accounting data
+
+
+
+
+```{r}
+colnames <- str_c("c", 1:44) 
+
+data <- read_xlsx(path = here("Raw Data",
+                              "Balance sheets 2013-2019  +.xlsx"),
+                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  skip = 15, n_max = 7745, # specific to this file
+                  col_names = colnames)
+
+tail(data)
+```
+
+
+
+```{r}
+(irritating_value <-  data$c5[7744])
+```
+
+
+
+```{r}
+data <- data %>% 
+  fill("c2", .direction = "down") %>% 
+  na_if(irritating_value)
+
+tail(data)
+```
+
+
+
+```{r}
+fixed_assets <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c5", medium = "c6",
+                    small = "c7", micro = "c8",
+                    var_name = "fixed_assets")
+head(fixed_assets)
+```
+
+```{r}
+current_assets <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c10", medium = "c11",
+                    small = "c12", micro = "c13",
+                    var_name = "current_assets")
+head(current_assets)
+```
+
+```{r}
+fixed_assets_and_leaving_group <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c15", medium = "c16",
+                    small = "c17", micro = "c18",
+                    var_name = "fixed_assets_and_leaving_group")
+head(fixed_assets_and_leaving_group)
+```
+
+
+```{r}
+equity <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c20", medium = "c21",
+                    small = "c22", micro = "c23",
+                    var_name = "equity")
+head(equity)
+```
+
+
+```{r}
+longterm_liabilities <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c25", medium = "c26",
+                    small = "c27", micro = "c28",
+                    var_name = "longterm_liabilities")
+head(longterm_liabilities)
+```
+
+
+
+```{r}
+current_liabilities <- data %>% 
+  extract_firms_var(group_code = "c2", year = "c3",
+                    large = "c30", medium = "c31",
+                    small = "c32", micro = "c33",
+                    var_name = "current_liabilities")
+head(current_liabilities)
+```
+
+join to the clean dataset
+```{r}
+clean <- clean %>%
+  left_join(fixed_assets) %>% 
+  left_join(current_assets) %>% 
+  left_join(fixed_assets_and_leaving_group) %>% 
+  left_join(equity) %>% 
+  left_join(longterm_liabilities) %>% 
+  left_join(current_liabilities)
+
+head(clean)
+```
+
+```{r}
+write_csv(x = clean,
+  here("Clean Data", "full_clean_data.csv")
+  )
+```
+
+
+
+I think that this is the all data I have 
+Now I will have to subset only food processors
+
+# Food Processors subset 
+
+
+
+
+
+
+
 
 
 Check how many NAs in each group. 
