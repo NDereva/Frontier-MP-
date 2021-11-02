@@ -31,7 +31,7 @@ colnames <- str_c("col_", 1:28)
 
 data <- read_xlsx(path = here("Raw Data",
                               "Costs structure 2012-2019  +.xlsx"),
-                  na = c("−", "к/с"), 
+                  na = c("к/с"), 
                   skip = 16, n_max = 7744, # specific to this file
                   col_names = colnames)
 
@@ -45,13 +45,34 @@ tail(data)
 Data have 2 levels of aggregation I think it will be safer to parse it with
 one variable in time
 
+There is two types of missing values "к/с" and "-"
+- "-" means that there is no companies 
+while "к/с" that there are companies but just a few of them so 
+the data is hidden out of the privacy concerns.
+
+Therefore to differentiate those I will code 
+"к/с" as NA
+and "-" as 0 
+
+
+UPD: it turned our that there are different types of dashes used:
+```{r}
+dash <- read_rds("Clean Data/dashes.rds")
+dash %>% unique()
+```
+
 
 fill name code and year to each row:
 ```{r}
-data <- data %>% 
+ data <- data %>% 
   fill(1:2, 28, .direction = "down") %>% 
-  na_if("к/с")  # read_xlsx did not changed it to NA
+  na_if("к/с") %>%  # read_xlsx did not changed it to NA
+  mutate(across(where(is.character),
+                ~ if_else(.x %in% dash, "0", .x) )) # change "-" to 0
+
 ```
+
+
 
 
 
@@ -68,12 +89,17 @@ clean <- data %>%
           "micro"      = "col_7") %>% 
   pivot_longer(cols = c("large", "medium", "small", "micro"),
                names_to = "firm_size", values_to = "total_cost") %>%
+  
   fill(group_name, group_code, .direction = "down") %>% 
   mutate_at(c("total_cost"), as.numeric) %>%  # convert to numeric
   mutate(year = as.integer(year))
 
   
 head(clean)
+```
+
+```{r}
+tail(clean)
 ```
 
 
@@ -123,6 +149,9 @@ material_costs <- data %>%
 head(material_costs)
 ```
 Seems to work fine
+
+
+
 
 ```{r}
 depreciation <- data %>% 
@@ -183,7 +212,7 @@ colnames <- str_c("c", 1:13)
 
 data <- read_xlsx(path = here("Raw Data",
                               "Production Value 2012-2019  +.xlsx"),
-                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  na = c("к/с"),      # dont know why but this line doesnt works
                   skip = 13, n_max = 7744, # specific to this file
                   col_names = colnames)
 
@@ -199,15 +228,21 @@ tail(data)
 I dont know what exactly is this dash above is coded
 so I assign it
 ```{r}
-(irritating_value <- data$c5[7700])
+# (dash <- data$c5[7700])
 ```
 
 ```{r}
 data <- data %>% 
   fill("c2", .direction = "down") %>% 
   na_if("к/с") %>% # read_xlsx did not changed it to NA
-  na_if(irritating_value)
+  mutate(across(where(is.character),
+                ~ if_else(.x %in% dash, "0", .x) )) # change "-" to 0
 ```
+
+```{r}
+tail(data)
+```
+
 
 Now NAs coded properly
 
@@ -238,7 +273,7 @@ colnames <- str_c("c", 1:32)
 
 data <- read_xlsx(path = here("Raw Data",
                               "Firms Number 2010-2019  +.xlsx"),
-                  na = c(irritating_value),    
+                  na = c("к/с"),    
                   skip = 16, n_max = 9680, # specific to this file
                   col_names = colnames)
 ```
@@ -248,13 +283,15 @@ tail(data)
 ```
 
 ```{r}
-(irritating_value <-  data$c4[9680])
+#dash <- c(dash, data$c4[9680])
+#dash
 ```
 
 ```{r}
 data <- data %>% 
   fill("c2", .direction = "down") %>% 
-  na_if(irritating_value)
+  mutate(across(where(is.character),
+                ~ if_else(.x %in% dash, "0", .x) )) # change "-" to 0
 ```
 
 
@@ -293,7 +330,7 @@ colnames <- str_c("c", 1:13)
 
 data <- read_xlsx(path = here("Raw Data",
                               "Number of Employers 2010-2020 +.xlsx"),
-                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  na = c("к/с"),      # dont know why but this line doesnt works
                   skip = 17, n_max = 10648, # specific to this file
                   col_names = colnames)
 
@@ -307,13 +344,18 @@ tail(data)
 
 
 ```{r}
-(irritating_value <-  data$c5[10647])
+#dash <- c(dash, data$c5[10648], data$c5[10647] )
+#dash <- unique(dash)
+#dash
 ```
+
+
 
 ```{r}
 data <- data %>% 
   fill("c2", .direction = "down") %>% 
-  na_if(irritating_value)
+  mutate(across(where(is.character),
+              ~ if_else(.x %in% dash, "0", .x) )) # change "-" to 0
 
 tail(data)
 ```
@@ -347,7 +389,7 @@ colnames <- str_c("c", 1:44)
 
 data <- read_xlsx(path = here("Raw Data",
                               "Balance sheets 2013-2019  +.xlsx"),
-                  na = c("−", "к/с"),      # dont know why but this line doesnt works
+                  na = c("к/с"),      # dont know why but this line doesnt works
                   skip = 15, n_max = 7745, # specific to this file
                   col_names = colnames)
 
@@ -356,16 +398,22 @@ tail(data)
 
 
 
-```{r}
-(irritating_value <-  data$c5[7744])
-```
 
+
+```{r}
+#dash <- c(dash, data$c5[7744])
+#dash <- unique(dash)
+#dash
+```
+Shit! Four different types of dashes
 
 
 ```{r}
 data <- data %>% 
-  fill("c2", .direction = "down") %>% 
-  na_if(irritating_value)
+  fill("c2", .direction = "down") %>%
+  na_if("к/c") %>% 
+  mutate(across(where(is.character),
+              ~ if_else(.x %in% dash, "0", .x) ))
 
 tail(data)
 ```
@@ -444,6 +492,11 @@ head(clean)
 ```
 
 ```{r}
+#write_rds(dash,  here("Clean Data", "dashes.rds"))
+```
+
+
+```{r}
 write_csv(x = clean,
   here("Clean Data", "full_clean_data.csv")
   )
@@ -456,7 +509,29 @@ Now I will have to subset only food processors
 
 # Food Processors subset 
 
+```{r}
+food_processors <- read_excel(
+  here("Raw Data", "Codes Food Producers.xlsx"),
+  col_names = "c1",
+  col_types = "numeric") %>%        ## there is some strange rounding 
+  fill(c1, .direction = "down") %>% ## when data imported as a text
+  mutate(c1 = as.character(c1)) %>% 
+  pull() %>% 
+  unique()
 
+food_processors
+```
+
+
+```{r}
+clean_food_processors <- clean %>% 
+  filter(group_code %in% food_processors)
+```
+
+```{r}
+write_csv(clean_food_processors,
+          here("Clean Data", "clean_food_processors.csv"))
+```
 
 
 
@@ -468,14 +543,17 @@ Check how many NAs in each group.
 To know which we can use for further analysis 
 
 ```{r}
-(
-no_na <- clean %>%
-  group_by(group_name) %>% 
-  summarise_if(is.numeric, ~ sum(is.na(.))) %>%
-  mutate(total_na = rowSums(across(where(is.numeric)))) %>% 
-  select(group_name, total_na) %>% 
-  filter(total_na == 0)
-)
+
+processors_na <- clean_food_processors %>%
+  group_by(group_code, group_name, firm_size) %>% 
+  summarise_if(is.numeric, ~ sum(is.na(.x))) %>%
+  mutate(total_na = rowSums(across(where(is.numeric))))
+
+```
+
+```{r}
+write_csv(processors_na,
+          here("Clean Data", "NA_summary.csv"))
 ```
 
 
